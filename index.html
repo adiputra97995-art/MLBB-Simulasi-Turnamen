@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ARENA FORGE — Custom Tournament Simulator</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          arena: {
+            bg: '#0A0E16',
+            surface: '#111827',
+            surface2: '#161F30',
+            border: '#232B3D',
+            text: '#E7ECF5',
+            muted: '#7C87A0',
+            violet: '#7C5CFF',
+            violetdark: '#4C2FBF',
+            cyan: '#22D3EE',
+            amber: '#FF9D3D',
+            red: '#FF5C7A',
+            gold: '#FFC857',
+            green: '#34D399',
+          }
+        },
+        fontFamily: {
+          display: ['Orbitron', 'sans-serif'],
+          body: ['Rajdhani', 'sans-serif'],
+        },
+        boxShadow: {
+          violet: '0 0 24px -6px rgba(124,92,255,0.55)',
+          cyan: '0 0 24px -6px rgba(34,211,238,0.5)',
+          amber: '0 0 24px -6px rgba(255,157,61,0.5)',
+          green: '0 0 18px -4px rgba(52,211,153,0.65)',
+          red: '0 0 18px -4px rgba(255,92,122,0.65)',
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  html { scroll-behavior: smooth; }
+  body { background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(124,92,255,0.14), transparent 60%),
+      radial-gradient(ellipse 900px 500px at 85% 0%, rgba(34,211,238,0.10), transparent 60%),
+      #0A0E16;
+  }
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+  ::-webkit-scrollbar-track { background: #0A0E16; }
+  ::-webkit-scrollbar-thumb { background: #2A3348; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3A4560; }
+
+  .stat-num { font-variant-numeric: tabular-nums; }
+
+  .fade-in { animation: fadeIn .4s ease both; }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+
+  .pop-in { animation: popIn .35s cubic-bezier(.2,.9,.3,1.2) both; }
+  @keyframes popIn { from { opacity:0; transform: scale(.92);} to {opacity:1; transform:scale(1);} }
+
+  .champion-glow { animation: glowPulse 2s ease-in-out infinite; }
+  @keyframes glowPulse {
+    0%,100% { box-shadow: 0 0 30px -4px rgba(255,200,87,0.6); }
+    50% { box-shadow: 0 0 55px 4px rgba(255,200,87,0.85); }
+  }
+
+  .badge-glow-green { animation: glowGreen 2.2s ease-in-out infinite; }
+  @keyframes glowGreen {
+    0%,100% { box-shadow: 0 0 8px -2px rgba(52,211,153,0.55); }
+    50% { box-shadow: 0 0 16px 0px rgba(52,211,153,0.85); }
+  }
+  .badge-glow-red { animation: glowRed 2.2s ease-in-out infinite; }
+  @keyframes glowRed {
+    0%,100% { box-shadow: 0 0 8px -2px rgba(255,92,122,0.55); }
+    50% { box-shadow: 0 0 16px 0px rgba(255,92,122,0.85); }
+  }
+
+  .ub-round { display:flex; flex-direction:column; justify-content: space-around; gap: 1rem; }
+
+  .badge-dot { width:8px; height:8px; border-radius:9999px; display:inline-block; }
+
+  .score-input {
+    width: 3.25rem; text-align:center; background:#0E1420; border:1px solid #2A3348;
+    border-radius:6px; padding:.4rem 0; font-weight:700; font-size:1.05rem;
+  }
+  .score-input:focus { outline:none; border-color:#7C5CFF; box-shadow:0 0 0 3px rgba(124,92,255,.2); }
+
+  input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+</style>
+</head>
+
+<body class="font-body text-arena-text min-h-screen">
+
+  <!-- HEADER -->
+  <header class="border-b border-arena-border/80 sticky top-0 z-30 backdrop-blur bg-arena-bg/85">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-md bg-gradient-to-br from-arena-violet to-arena-cyan flex items-center justify-center shadow-violet shrink-0">
+          <svg viewBox="0 0 24 24" class="w-5 h-5 text-arena-bg" fill="currentColor"><path d="M12 2 3 6v6c0 5 4 8.5 9 10 5-1.5 9-5 9-10V6l-9-4Z"/></svg>
+        </div>
+        <div>
+          <h1 class="font-display text-lg sm:text-xl tracking-wide leading-none">ARENA<span class="text-arena-violet">FORGE</span></h1>
+          <p class="text-[11px] sm:text-xs text-arena-muted tracking-widest uppercase -mt-0.5">Manual Score Tournament Simulator</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="phase-pill" class="hidden sm:inline-flex items-center gap-2 text-xs uppercase tracking-widest text-arena-muted border border-arena-border rounded-full px-3 py-1.5">
+          <span class="badge-dot bg-arena-violet"></span> Setup
+        </span>
+        <button data-action="show-history" class="text-xs sm:text-sm border border-arena-border hover:border-arena-violet hover:text-arena-violet transition rounded-md px-3 py-2 uppercase tracking-wide">
+          History
+        </button>
+        <button id="reset-btn" class="hidden text-xs sm:text-sm border border-arena-border hover:border-arena-red hover:text-arena-red transition rounded-md px-3 py-2 uppercase tracking-wide">
+          Reset
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="app" class="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10"></main>
+
+  <footer class="max-w-7xl mx-auto px-4 sm:px-6 pb-10 pt-4 text-center text-arena-muted text-xs tracking-wide">
+    Format: 16 Tim → Swiss Stage (M7 MLBB Rules, BO1/BO3, 3 Menang Lolos / 3 Kalah Gugur) → 8 Tim Playoff Double Elimination (BO5) → Grand Final (BO7) · Skor diinput manual
+  </footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------------------------------------------------------- */
+  /* CONSTANTS                                                          */
+  /* ---------------------------------------------------------------- */
+  const DEMO_NAMES = [
+    "Nova Wolves","Crimson Vanguard","Static Phantoms","Iron Serpents",
+    "Neon Havoc","Obsidian Reapers","Quantum Ronin","Void Alliance",
+    "Titan Circuit","Ghost Protocol","Solar Kings","Blackout Syndicate",
+    "Radiant Fury","Steel Kraken","Echo Nine","Apex Nomads"
+  ];
+
+  const HISTORY_KEY = "arena_forge_history";
+  const MAX_SWISS_ROUNDS = 5;
+  const QUALIFY_TARGET = 3; // wins needed to qualify
+  const ELIMINATE_TARGET = 3; // losses needed to be eliminated
+  const QUALIFIED_SLOTS = 8; // total teams that advance to playoffs
+
+  // Best-of format per Swiss round: Round 1-2 = BO1, Round 3-5 = BO3 (M7 rules).
+  function boForSwissRound(round){ return round <= 2 ? 1 : 3; }
+
+  // Sequential playoff steps for an 8-team double-elimination bracket.
+  // Each build(B) returns pairs [[aId,bId], ...] using ids already resolved
+  // in previous steps.
+  const STEP_DEFS = [
+    { key:"ubqf",   label:"Upper Bracket — Perempat Final", short:"UBQF",  bo:5,
+      build: (B) => pairSeeded(B.upperSeed) },
+    { key:"lbr1",   label:"Lower Bracket — Babak 1",        short:"LBR1",  bo:5,
+      build: (B) => [[B.ubqf[0].loserId,B.ubqf[3].loserId],[B.ubqf[1].loserId,B.ubqf[2].loserId]] },
+    { key:"ubsf",   label:"Upper Bracket — Semifinal",      short:"UBSF",  bo:5,
+      build: (B) => [[B.ubqf[0].winnerId,B.ubqf[1].winnerId],[B.ubqf[2].winnerId,B.ubqf[3].winnerId]] },
+    { key:"lbr2",   label:"Lower Bracket — Babak 2",        short:"LBR2",  bo:5,
+      build: (B) => [[B.lbr1[0].winnerId,B.ubsf[1].loserId],[B.lbr1[1].winnerId,B.ubsf[0].loserId]] },
+    { key:"lbsemi", label:"Lower Bracket — Semifinal",      short:"LB SF", bo:5,
+      build: (B) => [[B.lbr2[0].winnerId,B.lbr2[1].winnerId]] },
+    { key:"ubfinal",label:"Upper Bracket — Final",          short:"UB FINAL", bo:5,
+      build: (B) => [[B.ubsf[0].winnerId,B.ubsf[1].winnerId]] },
+    { key:"lbfinal",label:"Lower Bracket — Final",          short:"LB FINAL", bo:5,
+      build: (B) => [[B.lbsemi[0].winnerId,B.ubfinal[0].loserId]] },
+    { key:"grandfinal", label:"Grand Final",                short:"GRAND FINAL", bo:7,
+      build: (B) => [[B.ubfinal[0].winnerId,B.lbfinal[0].winnerId]] },
+  ];
+
+  /* ---------------------------------------------------------------- */
+  /* STATE                                                              */
+  /* ---------------------------------------------------------------- */
+  const state = {
+    phase: "setup",        // setup | swiss | playoffs
+    currentView: "setup",  // setup | swiss | playoffs | history | history-detail
+    teams: [],             // {id, name, wins, losses, gameDiff, status}
+    swissRound: 1,         // 1..5
+    swissMatches: [],       // swissMatches[roundIndex] = [{aId,bId,bo,played,scoreA,scoreB,winnerId,loserId}]
+    swissDone: false,
+    bracket: null,
+    roundIndex: 0,          // index into STEP_DEFS, STEP_DEFS.length = done
+    champion: null,
+    playoffTab: "bracket",        // "bracket" | "swiss" — sub-tab while in playoffs phase
+    savedToHistory: false,        // has the CURRENT finished tournament been saved already
+    historyDetail: null,          // loaded snapshot entry when viewing history-detail
+    historyDetailTab: "bracket",  // "bracket" | "swiss" — sub-tab while viewing a history entry
+    history: [],                   // in-memory mirror of localStorage history, loaded at init
+  };
+
+  /* ---------------------------------------------------------------- */
+  /* HELPERS                                                            */
+  /* ---------------------------------------------------------------- */
+  function shuffle(arr){
+    const a = arr.slice();
+    for (let i=a.length-1; i>0; i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+
+  function teamById(id, teamsSrc){ return (teamsSrc || state.teams).find(t => t.id === id); }
+
+  function initialsOf(name){
+    return (name||"?").trim().split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+  }
+
+  function avatarColor(id){
+    const hues = ['#7C5CFF','#22D3EE','#FF9D3D','#FF5C7A','#FFC857','#5CC8FF'];
+    return hues[id % hues.length];
+  }
+
+  function escapeHtml(s){
+    return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  function winsNeeded(bo){ return Math.ceil(bo/2); }
+
+  // Validate a manually entered score pair for a given best-of format.
+  //
+  // CORRECT ESPORTS BO LOGIC — the sum of both scores is NEVER checked.
+  // A team wins by being the FIRST to reach the win target (targetWin).
+  // The win target is the only number that matters:
+  //   - BO1 -> targetWin = 1. Valid scores: 1-0, 0-1.
+  //   - BO3 -> targetWin = 2. Valid scores: 2-0, 2-1, 0-2, 1-2.
+  //   - BO5 -> targetWin = 3. Valid scores: 3-0, 3-1, 3-2, 0-3, 1-3, 2-3.
+  //   - BO7 -> targetWin = 4. Valid scores: 4-0, 4-1, 4-2, 4-3, 0-4, 1-4, 2-4, 3-4.
+  function validateScore(scoreA, scoreB, bo){
+    const targetWin = Math.ceil(bo / 2);
+
+    // STEP 1 — strict empty check (must run BEFORE any numeric conversion,
+    // otherwise JS falsy-coercion could wrongly treat 0 as "empty").
+    if (scoreA === "" || scoreB === "" || scoreA === null || scoreB === null ||
+        scoreA === undefined || scoreB === undefined) {
+      return "Skor tidak boleh kosong.";
+    }
+
+    // STEP 2 — convert to integer explicitly with parseInt (base 10).
+    const a = parseInt(scoreA, 10);
+    const b = parseInt(scoreB, 10);
+
+    if (isNaN(a) || isNaN(b)) {
+      return "Skor harus berupa angka.";
+    }
+    if (a < 0 || b < 0) {
+      return "Skor tidak boleh negatif.";
+    }
+
+    // STEP 3 — neither side has reached the win target yet: match incomplete.
+    if (a !== targetWin && b !== targetWin) {
+      return "Pertandingan belum selesai, salah satu tim harus mencapai target menang!";
+    }
+
+    // STEP 4 — impossible / malformed combinations:
+    //   - both sides show the target win value at once (can't both "win")
+    //   - either side's score exceeds the target (game would've already ended)
+    //   - the losing side's score is not strictly below the target
+    if (a === targetWin && b === targetWin) {
+      return "Kombinasi skor tidak valid!";
+    }
+    if (a > targetWin || b > targetWin) {
+      return "Kombinasi skor tidak valid!";
+    }
+    const loserScore = (a === targetWin) ? b : a;
+    if (loserScore > targetWin - 1) {
+      return "Kombinasi skor tidak valid!";
+    }
+
+    // STEP 5 — all checks passed: score is VALID.
+    return null;
+  }
+
+  function pairSeeded(arr){
+    return [[arr[0],arr[7]], [arr[3],arr[4]], [arr[1],arr[6]], [arr[2],arr[5]]];
+  }
+
+  function mkMatch(aId, bId){
+    return { aId, bId, played:false, scoreA:null, scoreB:null, winnerId:null, loserId:null };
+  }
+
+  function mkSwissMatch(aId, bId, bo){
+    return { aId, bId, bo, played:false, scoreA:null, scoreB:null, winnerId:null, loserId:null };
+  }
+
+  function pairKey(a,b){ return a < b ? (a+"_"+b) : (b+"_"+a); }
+
+  /* ---------------------------------------------------------------- */
+  /* SETUP VIEW                                                         */
+  /* ---------------------------------------------------------------- */
+  function ensureTeamsSeed(){
+    if (state.teams.length === 0){
+      state.teams = DEMO_NAMES.map((n,i)=>({ id:i, name:"", wins:0, losses:0, gameDiff:0, status:"playing" }));
+    }
+  }
+
+  function renderSetup(){
+    ensureTeamsSeed();
+    const app = document.getElementById("app");
+    app.innerHTML = `
+      <div class="fade-in">
+        <div class="mb-8">
+          <p class="text-arena-violet uppercase tracking-[0.3em] text-xs font-semibold mb-2">Tahap 01</p>
+          <h2 class="font-display text-2xl sm:text-3xl mb-2">Susun 16 Tim Peserta</h2>
+          <p class="text-arena-muted max-w-2xl text-sm sm:text-base">Masukkan nama 16 tim. Semua hasil pertandingan akan diinput secara manual — tidak ada simulasi otomatis berbasis rating.</p>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mb-6">
+          <button data-action="fill-demo" class="text-xs sm:text-sm bg-arena-violet/15 border border-arena-violet/40 hover:bg-arena-violet/25 text-arena-violet transition rounded-md px-3 py-2 uppercase tracking-wide">Isi Otomatis (Demo)</button>
+          <button data-action="clear-teams" class="text-xs sm:text-sm bg-arena-surface2 border border-arena-border hover:border-arena-red/60 hover:text-arena-red transition rounded-md px-3 py-2 uppercase tracking-wide">Kosongkan</button>
+        </div>
+
+        <div id="team-form-grid" class="grid sm:grid-cols-2 gap-3 mb-8"></div>
+
+        <div id="setup-error" class="hidden text-arena-red text-sm mb-4"></div>
+
+        <button data-action="start-tournament" class="w-full sm:w-auto font-display tracking-wide text-sm sm:text-base bg-gradient-to-r from-arena-violet to-arena-cyan text-arena-bg font-bold rounded-md px-6 py-3.5 hover:brightness-110 transition shadow-violet">
+          MULAI TURNAMEN →
+        </button>
+      </div>
+    `;
+    renderTeamFormGrid();
+    bindGlobalActions();
+  }
+
+  function renderTeamFormGrid(){
+    const grid = document.getElementById("team-form-grid");
+    grid.innerHTML = state.teams.map((t, i) => `
+      <div class="bg-arena-surface border border-arena-border rounded-lg p-3 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center font-display text-[11px] font-bold shrink-0 text-arena-bg" style="background:${avatarColor(i)};">
+          ${i+1}
+        </div>
+        <input
+          type="text" placeholder="Nama Tim ${i+1}" value="${escapeHtml(t.name)}"
+          data-team-name="${i}"
+          class="bg-arena-surface2 border border-arena-border focus:border-arena-violet focus:outline-none rounded-md px-3 py-2 text-sm flex-1 min-w-0" />
+      </div>`).join("");
+
+    grid.querySelectorAll("[data-team-name]").forEach(inp=>{
+      inp.addEventListener("input", e=>{
+        const idx = +e.target.dataset.teamName;
+        state.teams[idx].name = e.target.value;
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* SWISS STAGE — M7 MLBB RULES                                        */
+  /* ---------------------------------------------------------------- */
+  function generateSwissStage(){
+    state.teams.forEach(t=>{ t.wins=0; t.losses=0; t.gameDiff=0; t.status="playing"; });
+    const shuffled = shuffle(state.teams);
+    const pairs = [];
+    for (let i=0;i<shuffled.length;i+=2){
+      pairs.push([shuffled[i].id, shuffled[i+1].id]);
+    }
+    const bo = boForSwissRound(1);
+    state.swissMatches = [ pairs.map(([a,b]) => mkSwissMatch(a,b,bo)) ];
+    state.swissRound = 1;
+    state.swissDone = false;
+    state.phase = "swiss";
+  }
+
+  function currentSwissRoundMatches(){
+    return state.swissMatches[state.swissRound-1] || [];
+  }
+
+  // Group still-"playing" teams into win-loss record pools, then pair within
+  // each pool. Any odd leftover in a pool is carried into the NEXT pool in
+  // the processing order (pools closest to qualification first), which
+  // effectively pairs it with the nearest neighboring-record pool as per
+  // Swiss System rules.
+  function pairNextSwissRound(){
+    const playing = state.teams.filter(t => t.status === "playing");
+
+    const pools = {};
+    playing.forEach(t=>{
+      const key = t.wins + "-" + t.losses;
+      (pools[key] = pools[key] || []).push(t);
+    });
+
+    // Process pools closest to qualifying first (higher wins, then lower losses).
+    const keys = Object.keys(pools).sort((ka,kb)=>{
+      const [aw,al] = ka.split("-").map(Number);
+      const [bw,bl] = kb.split("-").map(Number);
+      if (bw !== aw) return bw - aw;
+      return al - bl;
+    });
+
+    // Avoid immediate rematches where possible.
+    const usedPairKeys = new Set();
+    state.swissMatches.forEach(round => round.forEach(m => usedPairKeys.add(pairKey(m.aId, m.bId))));
+
+    const pairs = [];
+    let carry = [];
+    keys.forEach(key=>{
+      const group = carry.concat(pools[key]);
+      carry = [];
+
+      let arranged = shuffle(group);
+      // Try a handful of shuffles to reduce chance of an immediate rematch.
+      for (let attempt=0; attempt<15; attempt++){
+        const candidate = shuffle(group);
+        let ok = true;
+        for (let i=0;i<candidate.length-1;i+=2){
+          if (usedPairKeys.has(pairKey(candidate[i].id, candidate[i+1].id))){ ok = false; break; }
+        }
+        if (ok){ arranged = candidate; break; }
+        arranged = candidate;
+      }
+
+      for (let i=0;i<arranged.length-1;i+=2){
+        pairs.push([arranged[i].id, arranged[i+1].id]);
+      }
+      if (arranged.length % 2 === 1){
+        carry = [arranged[arranged.length-1]];
+      }
+    });
+
+    // Defensive fallback: if a single team is left over with nothing to pair
+    // (should not happen for a clean 16-team Swiss field), attach it to the
+    // last formed pair's second slot is not possible without a 3-way match,
+    // so instead pair it with the most recently processed team's opponent
+    // pool by simply appending it to the last pair group as a bye-less
+    // rematch of last resort.
+    if (carry.length === 1 && pairs.length > 0){
+      const orphan = carry[0];
+      const last = pairs.pop();
+      pairs.push([last[0], orphan.id]);
+      pairs.push([last[1], orphan.id === last[1] ? last[0] : last[1]]);
+    }
+
+    const nextRound = state.swissRound + 1;
+    const bo = boForSwissRound(nextRound);
+    state.swissMatches.push(pairs.map(([a,b]) => mkSwissMatch(a,b,bo)));
+  }
+
+  function saveSwissRound(){
+    const round = state.swissRound;
+    const bo = boForSwissRound(round);
+    const matches = currentSwissRoundMatches();
+    const errBox = document.getElementById("round-error");
+
+    const inputs = [];
+    for (let i=0;i<matches.length;i++){
+      const uid = `sw-${round}-${i}`;
+      const aEl = document.querySelector(`[data-score-a="${uid}"]`);
+      const bEl = document.querySelector(`[data-score-b="${uid}"]`);
+      const rawA = aEl ? aEl.value : "";
+      const rawB = bEl ? bEl.value : "";
+      const err = validateScore(rawA, rawB, bo);
+      if (err){
+        const teamA = teamById(matches[i].aId), teamB = teamById(matches[i].bId);
+        errBox.textContent = `${teamA.name} vs ${teamB.name}: ${err}`;
+        errBox.classList.remove("hidden");
+        return false;
+      }
+      inputs.push({ scoreA: parseInt(rawA, 10), scoreB: parseInt(rawB, 10) });
+    }
+
+    matches.forEach((m,i)=>{
+      m.scoreA = inputs[i].scoreA; m.scoreB = inputs[i].scoreB;
+      m.played = true;
+      m.winnerId = m.scoreA > m.scoreB ? m.aId : m.bId;
+      m.loserId  = m.scoreA > m.scoreB ? m.bId : m.aId;
+
+      const teamA = teamById(m.aId), teamB = teamById(m.bId);
+      teamA.gameDiff += (m.scoreA - m.scoreB);
+      teamB.gameDiff += (m.scoreB - m.scoreA);
+
+      const winner = teamById(m.winnerId), loser = teamById(m.loserId);
+      winner.wins += 1; loser.losses += 1;
+      if (winner.wins >= QUALIFY_TARGET) winner.status = "qualified";
+      if (loser.losses >= ELIMINATE_TARGET) loser.status = "eliminated";
+    });
+
+    const qualifiedCount = state.teams.filter(t=>t.status==="qualified").length;
+    if (qualifiedCount >= QUALIFIED_SLOTS || round >= MAX_SWISS_ROUNDS){
+      state.swissDone = true;
+    } else {
+      pairNextSwissRound();
+      state.swissRound += 1;
+    }
+    return true;
+  }
+
+  // Live Swiss standings: Win desc, Loss asc, then Game Difference desc.
+  function computeSwissStandings(teamsSrc){
+    const src = teamsSrc || state.teams;
+    return src.slice().sort((a,b)=>{
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      if (a.losses !== b.losses) return a.losses - b.losses;
+      if (b.gameDiff !== a.gameDiff) return b.gameDiff - a.gameDiff;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  function statusBadge(status){
+    if (status === "qualified"){
+      return `<span class="badge-glow-green text-[10px] uppercase tracking-widest font-bold text-arena-green bg-arena-green/10 border border-arena-green/50 rounded-full px-2.5 py-1">Qualified</span>`;
+    }
+    if (status === "eliminated"){
+      return `<span class="badge-glow-red text-[10px] uppercase tracking-widest font-bold text-arena-red bg-arena-red/10 border border-arena-red/50 rounded-full px-2.5 py-1">Eliminated</span>`;
+    }
+    return `<span class="text-[10px] uppercase tracking-widest font-bold text-arena-muted bg-arena-surface2 border border-arena-border rounded-full px-2.5 py-1">Playing</span>`;
+  }
+
+  function renderSwissStandingsTable(teamsSrc){
+    const sorted = computeSwissStandings(teamsSrc);
+    const rows = sorted.map((t, idx)=>`
+      <tr class="border-t border-arena-border/70">
+        <td class="py-2 pl-3 text-arena-muted stat-num text-sm w-6">${idx+1}</td>
+        <td class="py-2 pr-2">
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-arena-bg shrink-0" style="background:${avatarColor(t.id)};">${initialsOf(t.name)}</span>
+            <span class="text-sm font-medium truncate">${escapeHtml(t.name)}</span>
+          </div>
+        </td>
+        <td class="py-2 text-center stat-num text-sm text-arena-cyan">${t.wins}</td>
+        <td class="py-2 text-center stat-num text-sm text-arena-red">${t.losses}</td>
+        <td class="py-2 text-center stat-num text-sm text-arena-muted">${t.gameDiff>0?'+':''}${t.gameDiff}</td>
+        <td class="py-2 pr-3 text-right">${statusBadge(t.status)}</td>
+      </tr>`).join("");
+
+    return `
+    <div class="bg-arena-surface border border-arena-border rounded-xl overflow-hidden pop-in">
+      <table class="w-full">
+        <thead>
+          <tr class="text-[10px] uppercase tracking-widest text-arena-muted">
+            <th class="py-2 pl-3 text-left font-medium">#</th>
+            <th class="py-2 text-left font-medium">Tim</th>
+            <th class="py-2 text-center font-medium">W</th>
+            <th class="py-2 text-center font-medium">L</th>
+            <th class="py-2 text-center font-medium">GD</th>
+            <th class="py-2 pr-3 text-right font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }
+
+  function renderSwiss(){
+    const app = document.getElementById("app");
+    const round = state.swissRound;
+    const bo = boForSwissRound(round);
+    const done = state.swissDone;
+
+    app.innerHTML = `
+      <div class="fade-in">
+        <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p class="text-arena-cyan uppercase tracking-[0.3em] text-xs font-semibold mb-2">Tahap 02</p>
+            <h2 class="font-display text-2xl sm:text-3xl mb-2">Swiss Stage <span class="text-arena-muted text-base font-body align-middle">(M7 MLBB Rules)</span></h2>
+            <p class="text-arena-muted max-w-2xl text-sm sm:text-base">Tim dipasangkan tiap ronde berdasarkan rekor menang-kalah (pool). <strong class="text-arena-green">3 Kemenangan</strong> = lolos Playoff, <strong class="text-arena-red">3 Kekalahan</strong> = gugur. Ronde 1–2 <strong class="text-arena-text">Best of 1</strong>, Ronde 3–5 <strong class="text-arena-text">Best of 3</strong>.</p>
+          </div>
+          ${done ? `
+          <button data-action="proceed-playoffs" class="font-display text-sm bg-gradient-to-r from-arena-violet to-arena-cyan text-arena-bg font-bold rounded-md px-5 py-3 hover:brightness-110 transition shadow-violet whitespace-nowrap">
+            LANJUT KE PLAYOFF →
+          </button>` : ``}
+        </div>
+
+        <div class="flex items-center gap-1.5 mb-8">
+          ${Array.from({length:MAX_SWISS_ROUNDS}).map((_,i)=>{
+            const r = i+1;
+            const cls = (r < round || done) ? 'bg-arena-cyan' : (r === round ? 'bg-arena-cyan/40' : 'bg-arena-border');
+            return `<span class="h-1.5 flex-1 rounded-full ${cls}"></span>`;
+          }).join("")}
+        </div>
+
+        ${!done ? renderSwissRoundSchedule(round, bo) : `
+          <div class="bg-arena-green/10 border border-arena-green/40 rounded-lg px-4 py-3 mb-8 text-sm text-arena-green flex items-center gap-2">
+            <span class="badge-dot bg-arena-green"></span> Swiss Stage selesai — 8 tim lolos ke Playoff.
+          </div>
+        `}
+
+        <h3 class="font-display text-sm tracking-widest text-arena-muted mb-4">LIVE SWISS STANDINGS</h3>
+        <div id="swiss-standings"></div>
+      </div>
+    `;
+    document.getElementById("swiss-standings").innerHTML = renderSwissStandingsTable(state.teams);
+    bindGlobalActions();
+  }
+
+  function renderSwissRoundSchedule(round, bo){
+    const matches = currentSwissRoundMatches();
+    const rows = matches.map((m,i)=>matchInputRow(m, `sw-${round}-${i}`, bo)).join("");
+    return `
+    <div class="bg-arena-surface2/40 border border-arena-border rounded-xl p-4 sm:p-5 mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-display text-sm sm:text-base tracking-widest text-arena-cyan">JADWAL — ROUND ${round} <span class="text-arena-muted normal-case tracking-normal">(Best of ${bo})</span></h3>
+      </div>
+      <div class="divide-y divide-arena-border/60 bg-arena-surface border border-arena-border rounded-lg overflow-hidden mb-5">${rows}</div>
+      <div id="round-error" class="hidden text-arena-red text-sm mb-3"></div>
+      <button data-action="save-swiss-round" class="font-display text-sm bg-gradient-to-r from-arena-cyan to-arena-violet text-arena-bg font-bold rounded-md px-5 py-3 hover:brightness-110 transition shadow-cyan">
+        SIMPAN &amp; UPDATE STANDINGS
+      </button>
+    </div>`;
+  }
+
+  // Read-only Swiss results: full standings + round-by-round match history.
+  // Used both as a tab inside the live Playoffs page and inside the History
+  // Detail view for saved tournaments.
+  function renderSwissResultsReadOnly(teamsSrc, swissMatches){
+    const standings = renderSwissStandingsTable(teamsSrc);
+    const rounds = swissMatches.map((roundMatches, ri)=>{
+      const bo = roundMatches[0] ? roundMatches[0].bo : boForSwissRound(ri+1);
+      const rows = roundMatches.map((m,i)=>matchInputRow(m, `swro-${ri}-${i}`, bo, teamsSrc)).join("");
+      return `
+      <div class="bg-arena-surface border border-arena-border rounded-lg overflow-hidden">
+        <div class="px-4 py-2 bg-arena-surface2/60 border-b border-arena-border font-display text-xs tracking-widest">ROUND ${ri+1} <span class="text-arena-muted normal-case tracking-normal">(Best of ${bo})</span></div>
+        <div class="divide-y divide-arena-border/60">${rows}</div>
+      </div>`;
+    }).join("");
+
+    return `
+    <div>
+      <h3 class="font-display text-xs tracking-widest text-arena-muted mb-4">KLASEMEN FINAL SWISS STAGE</h3>
+      <div class="mb-10">${standings}</div>
+      <h3 class="font-display text-xs tracking-widest text-arena-muted mb-4">RIWAYAT MATCH SWISS STAGE</h3>
+      <div class="grid md:grid-cols-2 gap-5">${rounds}</div>
+    </div>`;
+  }
+
+  /* Shared: one editable/read-only match row with score inputs -------- */
+  function matchInputRow(match, uid, bo, teamsSrc){
+    const teamA = match.aId!=null ? teamById(match.aId, teamsSrc) : null;
+    const teamB = match.bId!=null ? teamById(match.bId, teamsSrc) : null;
+    const nameCell = (team) => team ? `
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-arena-bg shrink-0" style="background:${avatarColor(team.id)};">${initialsOf(team.name)}</span>
+        <span class="text-sm font-medium truncate">${escapeHtml(team.name)}</span>
+      </div>` : `<span class="text-sm italic text-arena-muted">TBD</span>`;
+
+    if (match.played){
+      return `
+      <div class="flex items-center justify-between px-4 py-3 gap-3">
+        <div class="flex-1 min-w-0 ${match.winnerId===match.aId?'':'opacity-60'}">${nameCell(teamA)}</div>
+        <div class="stat-num font-display text-sm px-2 ${match.winnerId===match.aId?'text-arena-cyan':'text-arena-muted'}">${match.scoreA}</div>
+        <div class="text-arena-muted text-xs">—</div>
+        <div class="stat-num font-display text-sm px-2 ${match.winnerId===match.bId?'text-arena-cyan':'text-arena-muted'}">${match.scoreB}</div>
+        <div class="flex-1 min-w-0 text-right ${match.winnerId===match.bId?'':'opacity-60'}">${nameCell(teamB)}</div>
+      </div>`;
+    }
+
+    // Max a team can score is winsNeeded(bo) (e.g. BO1 -> 1, BO3 -> 2, BO5 -> 3).
+    const need = winsNeeded(bo);
+    return `
+    <div class="flex items-center justify-between px-4 py-3 gap-3" data-match-row="${uid}">
+      <div class="flex-1 min-w-0">${nameCell(teamA)}</div>
+      <input type="number" inputmode="numeric" min="0" max="${need}" step="1" class="score-input" data-score-a="${uid}" data-max="${need}" placeholder="0" />
+      <div class="text-arena-muted text-xs">vs</div>
+      <input type="number" inputmode="numeric" min="0" max="${need}" step="1" class="score-input" data-score-b="${uid}" data-max="${need}" placeholder="0" />
+      <div class="flex-1 min-w-0 text-right">${nameCell(teamB)}</div>
+    </div>`;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* PLAYOFF BRACKET CONSTRUCTION                                       */
+  /* ---------------------------------------------------------------- */
+  function buildBracket(){
+    const qualified = state.teams.filter(t => t.status === "qualified");
+    // Seed: fewer losses first (3-0 before 3-1 before 3-2), then Game Diff desc.
+    // This places 3-0 / 3-1 records in the top seeds and 3-2 records at the bottom.
+    const sorted = qualified.slice().sort((a,b)=>{
+      if (a.losses !== b.losses) return a.losses - b.losses;
+      if (b.gameDiff !== a.gameDiff) return b.gameDiff - a.gameDiff;
+      return a.name.localeCompare(b.name);
+    });
+
+    state.bracket = {
+      upperSeed: sorted.map(t=>t.id),
+      ubqf:[], lbr1:[], ubsf:[], lbr2:[], lbsemi:[], ubfinal:[], lbfinal:[], grandfinal:[],
+    };
+    state.roundIndex = 0;
+    state.champion = null;
+    state.phase = "playoffs";
+    buildStepMatches(0);
+  }
+
+  function buildStepMatches(idx){
+    const def = STEP_DEFS[idx];
+    const pairs = def.build(state.bracket);
+    state.bracket[def.key] = pairs.map(([a,b]) => mkMatch(a,b));
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* PLAYOFF RENDER                                                      */
+  /* ---------------------------------------------------------------- */
+  function renderPlayoffs(){
+    const app = document.getElementById("app");
+    const B = state.bracket;
+    const done = state.roundIndex >= STEP_DEFS.length;
+    const currentDef = !done ? STEP_DEFS[state.roundIndex] : null;
+    const tab = state.playoffTab || "bracket";
+
+    app.innerHTML = `
+      <div class="fade-in">
+        <div class="mb-6">
+          <p class="text-arena-amber uppercase tracking-[0.3em] text-xs font-semibold mb-2">Tahap 03</p>
+          <h2 class="font-display text-2xl sm:text-3xl mb-2">Playoff — Double Elimination (8 Tim)</h2>
+          <p class="text-arena-muted text-sm sm:text-base">${done ? 'Turnamen selesai.' : 'Skor diinput manual per babak sesuai jadwal di bawah.'}</p>
+        </div>
+
+        <div class="flex items-center gap-1.5 mb-8">
+          ${STEP_DEFS.map((r,i)=>`<span class="h-1.5 flex-1 rounded-full ${i < state.roundIndex ? 'bg-arena-amber' : (i===state.roundIndex ? 'bg-arena-amber/40' : 'bg-arena-border')}"></span>`).join("")}
+        </div>
+
+        ${state.champion ? renderChampionBanner() : ""}
+
+        ${!done ? renderPlayoffRoundSchedule(currentDef) : ""}
+
+        <div class="flex flex-wrap gap-2 mb-6">
+          ${tabBtn("playoff-tab-bracket", "Playoff Bracket", tab==="bracket")}
+          ${tabBtn("playoff-tab-swiss", "Hasil Swiss Stage", tab==="swiss")}
+        </div>
+
+        ${tab === "bracket" ? renderBracketSummary(B, state.teams) : renderSwissResultsReadOnly(state.teams, state.swissMatches)}
+      </div>
+    `;
+    bindGlobalActions();
+  }
+
+  // Small pill-style tab button used by the Playoff Bracket / Hasil Swiss Stage switcher
+  // (both in the live playoffs view and in the read-only history detail view).
+  function tabBtn(action, label, active){
+    return `<button data-action="${action}" class="font-display text-xs sm:text-sm rounded-md px-4 py-2.5 uppercase tracking-wide transition border ${active
+      ? 'bg-gradient-to-r from-arena-violet to-arena-cyan text-arena-bg font-bold border-transparent shadow-violet'
+      : 'bg-arena-surface2 border-arena-border text-arena-muted hover:text-arena-text hover:border-arena-violet/50'}">${label}</button>`;
+  }
+
+  // Upper/Lower Bracket + Grand Final summary grid (8-team double elim).
+  // Shared between the live playoffs view and the read-only history detail view.
+  function renderBracketSummary(B, teamsSrc){
+    return `
+    <h3 class="font-display text-xs tracking-widest text-arena-muted mb-4">RINGKASAN BRACKET</h3>
+    <div class="space-y-10">
+      <section>
+        <h3 class="font-display text-xs tracking-[0.25em] text-arena-violet mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-arena-violet"></span> UPPER BRACKET
+        </h3>
+        <div class="grid grid-cols-3 gap-6 overflow-x-auto pb-2">
+          <div class="ub-round">${B.ubqf.length ? B.ubqf.map(m=>bracketCard(m,"violet",null,teamsSrc)).join("") : placeholderCol(4)}</div>
+          <div class="ub-round">${B.ubsf.length ? B.ubsf.map(m=>bracketCard(m,"violet",null,teamsSrc)).join("") : placeholderCol(2)}</div>
+          <div class="ub-round flex items-center">${B.ubfinal[0] ? bracketCard(B.ubfinal[0],"gold","UB FINAL",teamsSrc) : placeholderCard("UB FINAL")}</div>
+        </div>
+      </section>
+
+      <section>
+        <h3 class="font-display text-xs tracking-[0.25em] text-arena-amber mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-arena-amber"></span> LOWER BRACKET
+        </h3>
+        <div class="grid grid-cols-4 gap-4 overflow-x-auto pb-2">
+          <div class="ub-round">${B.lbr1.length ? B.lbr1.map(m=>bracketCard(m,"amber",null,teamsSrc)).join("") : placeholderCol(2)}</div>
+          <div class="ub-round">${B.lbr2.length ? B.lbr2.map(m=>bracketCard(m,"amber",null,teamsSrc)).join("") : placeholderCol(2)}</div>
+          <div class="ub-round flex items-center">${B.lbsemi[0] ? bracketCard(B.lbsemi[0],"amber","LB SEMI",teamsSrc) : placeholderCard("LB SEMI")}</div>
+          <div class="ub-round flex items-center">${B.lbfinal[0] ? bracketCard(B.lbfinal[0],"gold","LB FINAL",teamsSrc) : placeholderCard("LB FINAL")}</div>
+        </div>
+      </section>
+
+      <section>
+        <h3 class="font-display text-xs tracking-[0.25em] text-arena-gold mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-arena-gold"></span> GRAND FINAL <span class="text-arena-muted normal-case tracking-normal">(Best of 7)</span>
+        </h3>
+        <div class="max-w-sm">${B.grandfinal[0] ? bracketCard(B.grandfinal[0],"gold","GRAND FINAL",teamsSrc) : placeholderCard("GRAND FINAL")}</div>
+      </section>
+    </div>`;
+  }
+
+  function renderPlayoffRoundSchedule(def){
+    const matches = state.bracket[def.key];
+    const rows = matches.map((m,i)=>matchInputRow(m, `po-${def.key}-${i}`, def.bo)).join("");
+    return `
+    <div class="bg-arena-surface2/40 border border-arena-border rounded-xl p-4 sm:p-5 mb-10">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-display text-sm sm:text-base tracking-widest text-arena-amber">JADWAL — ${def.label.toUpperCase()} <span class="text-arena-muted normal-case tracking-normal">(Best of ${def.bo})</span></h3>
+      </div>
+      <div class="divide-y divide-arena-border/60 bg-arena-surface border border-arena-border rounded-lg overflow-hidden mb-5">${rows}</div>
+      <div id="round-error" class="hidden text-arena-red text-sm mb-3"></div>
+      <button data-action="save-playoff-round" class="font-display text-sm bg-gradient-to-r from-arena-amber to-arena-violet text-arena-bg font-bold rounded-md px-5 py-3 hover:brightness-110 transition shadow-amber">
+        SIMPAN &amp; UPDATE BRACKET
+      </button>
+    </div>`;
+  }
+
+  function renderChampionBanner(){
+    const c = state.champion;
+    const saved = state.savedToHistory;
+    return `
+    <div class="champion-glow bg-gradient-to-r from-arena-gold/15 via-arena-surface to-arena-surface border border-arena-gold/50 rounded-xl p-6 mb-8 flex flex-wrap items-center gap-5 pop-in">
+      <div class="w-16 h-16 rounded-full bg-arena-gold/20 border-2 border-arena-gold flex items-center justify-center font-display text-xl font-bold text-arena-gold shrink-0">
+        ${initialsOf(c.name)}
+      </div>
+      <div class="flex-1 min-w-[160px]">
+        <p class="uppercase tracking-[0.3em] text-xs text-arena-gold font-semibold mb-1">Juara Turnamen</p>
+        <h3 class="font-display text-2xl sm:text-3xl">${escapeHtml(c.name)}</h3>
+      </div>
+      <button data-action="save-history" ${saved ? "disabled" : ""} class="font-display text-xs sm:text-sm rounded-md px-4 py-3 uppercase tracking-wide transition whitespace-nowrap ${saved
+        ? 'bg-arena-green/15 border border-arena-green/50 text-arena-green cursor-default'
+        : 'bg-arena-gold/15 border border-arena-gold/50 hover:bg-arena-gold/25 text-arena-gold shadow-amber'}">
+        ${saved ? '✓ Tersimpan di History' : 'Simpan Hasil Turnamen'}
+      </button>
+    </div>`;
+  }
+
+  function placeholderCard(tag){
+    return `
+    <div class="bg-arena-surface/40 border border-dashed border-arena-border rounded-lg p-2.5 min-w-[168px] opacity-50">
+      <div class="text-[10px] uppercase tracking-widest text-arena-muted mb-1">${tag||'TBD'}</div>
+      <div class="text-xs text-arena-muted py-2 text-center">Menunggu...</div>
+    </div>`;
+  }
+  function placeholderCol(n){
+    return Array.from({length:n}).map(()=>placeholderCard()).join("");
+  }
+
+  // Read-only bracket summary card (used in "RINGKASAN BRACKET" section and history view)
+  function bracketCard(match, color, tag, teamsSrc){
+    const colorMap = {
+      violet: {border:"border-arena-violet/30", tag:"text-arena-violet"},
+      amber:  {border:"border-arena-amber/30",  tag:"text-arena-amber"},
+      gold:   {border:"border-arena-gold/50",   tag:"text-arena-gold"},
+    };
+    const c = colorMap[color] || colorMap.violet;
+    const teamA = match.aId!=null ? teamById(match.aId, teamsSrc) : null;
+    const teamB = match.bId!=null ? teamById(match.bId, teamsSrc) : null;
+
+    const rowFor = (team, score, isWinner) => {
+      if (!team) return `<div class="flex items-center justify-between py-1.5 px-2 text-arena-muted text-xs italic">TBD</div>`;
+      return `
+      <div class="flex items-center justify-between py-1.5 px-2 rounded ${match.played && isWinner ? 'bg-arena-violet/10' : ''}">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-arena-bg shrink-0" style="background:${avatarColor(team.id)};">${initialsOf(team.name)}</span>
+          <span class="text-xs sm:text-sm truncate ${match.played && !isWinner ? 'text-arena-muted' : 'font-medium'}">${escapeHtml(team.name)}</span>
+        </div>
+        <span class="stat-num text-sm font-bold ml-2 ${match.played && isWinner ? 'text-arena-cyan' : 'text-arena-muted'}">${match.played ? score : ''}</span>
+      </div>`;
+    };
+
+    return `
+    <div class="bg-arena-surface border ${c.border} rounded-lg p-2 min-w-[168px] pop-in">
+      ${tag ? `<div class="text-[10px] uppercase tracking-widest ${c.tag} font-semibold mb-1 px-1">${tag}</div>` : ''}
+      ${rowFor(teamA, match.scoreA, match.winnerId===match.aId)}
+      <div class="border-t border-arena-border/60"></div>
+      ${rowFor(teamB, match.scoreB, match.winnerId===match.bId)}
+    </div>`;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* HISTORY (localStorage persistence — anti-hilang)                   */
+  /* ---------------------------------------------------------------- */
+  function getHistoryList(){
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list : [];
+    } catch(e){
+      console.warn("Gagal membaca history dari localStorage:", e);
+      return [];
+    }
+  }
+
+  function setHistoryList(list){
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+      return true;
+    } catch(e){
+      console.warn("Gagal menyimpan history ke localStorage:", e);
+      return false;
+    }
+  }
+
+  // Persist the just-finished tournament (state.champion must already be set)
+  // as a self-contained snapshot so it can be reloaded later in read-only mode.
+  function saveToHistory(){
+    if (!state.champion) return null;
+    const entry = {
+      id: Date.now(),
+      date: new Date().toLocaleString("id-ID", { dateStyle:"medium", timeStyle:"short" }),
+      championName: state.champion.name,
+      participants: state.teams.map(t=>t.name),
+      snapshot: {
+        teams: JSON.parse(JSON.stringify(state.teams)),
+        swissMatches: JSON.parse(JSON.stringify(state.swissMatches)),
+        bracket: JSON.parse(JSON.stringify(state.bracket)),
+        champion: JSON.parse(JSON.stringify(state.champion)),
+      }
+    };
+    const list = getHistoryList();
+    list.unshift(entry);
+    const ok = setHistoryList(list);
+    if (!ok){
+      alert("Gagal menyimpan ke localStorage (mungkin penuh atau diblokir browser).");
+      return null;
+    }
+    state.history = list;
+    return entry;
+  }
+
+  // Load a saved entry into state.historyDetail for read-only viewing.
+  // Does NOT touch the live in-progress tournament (state.teams/swissMatches/bracket).
+  function loadFromHistory(id){
+    const list = getHistoryList();
+    const entry = list.find(e => String(e.id) === String(id));
+    if (!entry) return null;
+    state.historyDetail = entry;
+    state.historyDetailTab = "bracket";
+    state.currentView = "history-detail";
+    return entry;
+  }
+
+  function deleteFromHistory(id){
+    const list = getHistoryList().filter(e => String(e.id) !== String(id));
+    setHistoryList(list);
+    state.history = list;
+  }
+
+  function renderHistory(){
+    state.currentView = "history";
+    const app = document.getElementById("app");
+    const list = getHistoryList();
+    app.innerHTML = `
+      <div class="fade-in">
+        <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p class="text-arena-cyan uppercase tracking-[0.3em] text-xs font-semibold mb-2">Arsip</p>
+            <h2 class="font-display text-2xl sm:text-3xl mb-2">History Turnamen</h2>
+            <p class="text-arena-muted max-w-2xl text-sm sm:text-base">Daftar turnamen yang tersimpan di perangkat ini (localStorage). Data ini tetap ada meski browser di-refresh atau ditutup.</p>
+          </div>
+          <button data-action="back-to-tournament" class="text-xs sm:text-sm border border-arena-border hover:border-arena-cyan hover:text-arena-cyan transition rounded-md px-3 py-2 uppercase tracking-wide whitespace-nowrap">
+            ← Kembali ke Turnamen
+          </button>
+        </div>
+
+        ${list.length === 0 ? `
+        <div class="bg-arena-surface2/40 border border-dashed border-arena-border rounded-xl p-10 text-center text-arena-muted text-sm">
+          Belum ada turnamen yang disimpan.<br/>Selesaikan sebuah turnamen lalu klik <span class="text-arena-gold font-semibold">"Simpan Hasil Turnamen"</span> pada banner juara.
+        </div>` : `
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5" id="history-grid"></div>`}
+      </div>
+    `;
+    if (list.length){
+      document.getElementById("history-grid").innerHTML = list.map(historyCard).join("");
+    }
+    bindGlobalActions();
+  }
+
+  function historyCard(entry){
+    const participants = entry.participants || [];
+    const preview = participants.slice(0,3).join(", ");
+    const more = participants.length > 3 ? ` &amp; ${participants.length - 3} lainnya` : "";
+    return `
+    <div class="bg-arena-surface border border-arena-border rounded-xl overflow-hidden pop-in flex flex-col">
+      <div class="px-4 py-3 border-b border-arena-border bg-arena-surface2/50 flex items-center justify-between">
+        <span class="text-[10px] uppercase tracking-widest text-arena-muted">${escapeHtml(entry.date)}</span>
+        <span class="badge-dot bg-arena-gold"></span>
+      </div>
+      <div class="p-4 flex-1">
+        <p class="text-[10px] uppercase tracking-widest text-arena-gold font-semibold mb-1">Juara</p>
+        <h3 class="font-display text-lg mb-3 truncate">${escapeHtml(entry.championName)}</h3>
+        <p class="text-xs text-arena-muted">${participants.length} tim · ${escapeHtml(preview)}${more}</p>
+      </div>
+      <div class="p-4 pt-0 flex gap-2">
+        <button data-action="load-history" data-id="${entry.id}" class="flex-1 text-xs bg-arena-violet/15 border border-arena-violet/40 hover:bg-arena-violet/25 text-arena-violet transition rounded-md px-3 py-2 uppercase tracking-wide">
+          Lihat Detail
+        </button>
+        <button data-action="delete-history" data-id="${entry.id}" class="text-xs bg-arena-surface2 border border-arena-border hover:border-arena-red/60 hover:text-arena-red transition rounded-md px-3 py-2 uppercase tracking-wide">
+          Hapus
+        </button>
+      </div>
+    </div>`;
+  }
+
+  function renderHistoryDetail(){
+    const entry = state.historyDetail;
+    if (!entry){ renderHistory(); return; }
+    const snap = entry.snapshot;
+    const teams = snap.teams;
+    const tab = state.historyDetailTab || "bracket";
+    const app = document.getElementById("app");
+
+    app.innerHTML = `
+      <div class="fade-in">
+        <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p class="text-arena-gold uppercase tracking-[0.3em] text-xs font-semibold mb-2">Arsip · ${escapeHtml(entry.date)}</p>
+            <h2 class="font-display text-2xl sm:text-3xl mb-2">Detail Turnamen (Read-Only)</h2>
+            <p class="text-arena-muted text-sm sm:text-base">Data dimuat dari history tersimpan — tidak dapat diedit.</p>
+          </div>
+          <button data-action="back-to-history-list" class="text-xs sm:text-sm border border-arena-border hover:border-arena-cyan hover:text-arena-cyan transition rounded-md px-3 py-2 uppercase tracking-wide whitespace-nowrap">
+            ← Kembali ke History
+          </button>
+        </div>
+
+        <div class="champion-glow bg-gradient-to-r from-arena-gold/15 via-arena-surface to-arena-surface border border-arena-gold/50 rounded-xl p-6 mb-8 flex items-center gap-5 pop-in">
+          <div class="w-16 h-16 rounded-full bg-arena-gold/20 border-2 border-arena-gold flex items-center justify-center font-display text-xl font-bold text-arena-gold shrink-0">
+            ${initialsOf(entry.championName)}
+          </div>
+          <div>
+            <p class="uppercase tracking-[0.3em] text-xs text-arena-gold font-semibold mb-1">Juara Turnamen</p>
+            <h3 class="font-display text-2xl sm:text-3xl">${escapeHtml(entry.championName)}</h3>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mb-6">
+          ${tabBtn("history-detail-tab-bracket", "Playoff Bracket", tab==="bracket")}
+          ${tabBtn("history-detail-tab-swiss", "Hasil Swiss Stage", tab==="swiss")}
+        </div>
+
+        ${tab === "bracket" ? renderBracketSummary(snap.bracket, teams) : renderSwissResultsReadOnly(teams, snap.swissMatches)}
+      </div>
+    `;
+    bindGlobalActions();
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* SAVE HANDLERS                                                       */
+  /* ---------------------------------------------------------------- */
+  function savePlayoffRound(){
+    const def = STEP_DEFS[state.roundIndex];
+    const matches = state.bracket[def.key];
+    const errBox = document.getElementById("round-error");
+
+    const inputs = [];
+    for (let i=0;i<matches.length;i++){
+      const uid = `po-${def.key}-${i}`;
+      const aEl = document.querySelector(`[data-score-a="${uid}"]`);
+      const bEl = document.querySelector(`[data-score-b="${uid}"]`);
+      const rawA = aEl ? aEl.value : "";
+      const rawB = bEl ? bEl.value : "";
+      const err = validateScore(rawA, rawB, def.bo);
+      if (err){
+        const teamA = teamById(matches[i].aId), teamB = teamById(matches[i].bId);
+        errBox.textContent = `${teamA.name} vs ${teamB.name}: ${err}`;
+        errBox.classList.remove("hidden");
+        return false;
+      }
+      inputs.push({ scoreA: parseInt(rawA, 10), scoreB: parseInt(rawB, 10) });
+    }
+
+    matches.forEach((m,i)=>{
+      m.scoreA = inputs[i].scoreA; m.scoreB = inputs[i].scoreB;
+      m.played = true;
+      m.winnerId = m.scoreA > m.scoreB ? m.aId : m.bId;
+      m.loserId  = m.scoreA > m.scoreB ? m.bId : m.aId;
+    });
+
+    state.roundIndex += 1;
+    if (state.roundIndex < STEP_DEFS.length){
+      buildStepMatches(state.roundIndex);
+    } else {
+      state.champion = teamById(state.bracket.grandfinal[0].winnerId);
+    }
+    return true;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* ACTIONS / EVENTS                                                    */
+  /* ---------------------------------------------------------------- */
+  function bindGlobalActions(){
+    document.querySelectorAll("[data-action]").forEach(el=>{
+      el.onclick = (e)=>{
+        const action = e.currentTarget.dataset.action;
+        const id = e.currentTarget.dataset.id;
+        handleAction(action, id);
+      };
+    });
+  }
+
+  function handleAction(action, id){
+    if (action === "fill-demo"){
+      state.teams.forEach((t,i)=>{ t.name = DEMO_NAMES[i]; });
+      renderTeamFormGrid();
+    }
+    else if (action === "clear-teams"){
+      state.teams.forEach(t=>{ t.name=""; });
+      renderTeamFormGrid();
+    }
+    else if (action === "start-tournament"){
+      const errBox = document.getElementById("setup-error");
+      const empty = state.teams.filter(t=>!t.name.trim());
+      if (empty.length){
+        errBox.textContent = `Lengkapi semua 16 nama tim terlebih dahulu (${empty.length} tim masih kosong).`;
+        errBox.classList.remove("hidden");
+        return;
+      }
+      errBox.classList.add("hidden");
+      generateSwissStage();
+      state.currentView = "swiss";
+      renderSwiss();
+      updateChrome();
+    }
+    else if (action === "save-swiss-round"){
+      if (saveSwissRound()) renderSwiss();
+    }
+    else if (action === "proceed-playoffs"){
+      buildBracket();
+      state.currentView = "playoffs";
+      state.playoffTab = "bracket";
+      renderPlayoffs();
+      updateChrome();
+    }
+    else if (action === "save-playoff-round"){
+      if (savePlayoffRound()) renderPlayoffs();
+    }
+    else if (action === "playoff-tab-bracket"){
+      state.playoffTab = "bracket";
+      renderPlayoffs();
+    }
+    else if (action === "playoff-tab-swiss"){
+      state.playoffTab = "swiss";
+      renderPlayoffs();
+    }
+    else if (action === "save-history"){
+      const entry = saveToHistory();
+      if (entry) state.savedToHistory = true;
+      renderPlayoffs();
+    }
+    else if (action === "show-history"){
+      renderHistory();
+    }
+    else if (action === "back-to-tournament"){
+      state.currentView = state.phase;
+      if (state.phase === "swiss") renderSwiss();
+      else if (state.phase === "playoffs") renderPlayoffs();
+      else renderSetup();
+    }
+    else if (action === "load-history"){
+      if (loadFromHistory(id)) renderHistoryDetail();
+    }
+    else if (action === "delete-history"){
+      if (confirm("Hapus riwayat turnamen ini secara permanen?")){
+        deleteFromHistory(id);
+        renderHistory();
+      }
+    }
+    else if (action === "back-to-history-list"){
+      renderHistory();
+    }
+    else if (action === "history-detail-tab-bracket"){
+      state.historyDetailTab = "bracket";
+      renderHistoryDetail();
+    }
+    else if (action === "history-detail-tab-swiss"){
+      state.historyDetailTab = "swiss";
+      renderHistoryDetail();
+    }
+  }
+
+  function updateChrome(){
+    const pill = document.getElementById("phase-pill");
+    const resetBtn = document.getElementById("reset-btn");
+    const labels = { setup:"Setup", swiss:"Swiss Stage", playoffs:"Playoff" };
+    const dotColor = { setup:"bg-arena-violet", swiss:"bg-arena-cyan", playoffs:"bg-arena-amber" };
+    pill.innerHTML = `<span class="badge-dot ${dotColor[state.phase]}"></span> ${labels[state.phase]}`;
+    resetBtn.classList.remove("hidden");
+  }
+
+  // Real-time hard limit on score inputs: strips non-digit characters and
+  // clamps the value to [0, data-max] as the user types, so it's impossible
+  // to type a score outside the current match's BO format.
+  document.addEventListener("input", (e)=>{
+    const el = e.target;
+    if (!el.classList || !el.classList.contains("score-input")) return;
+    let raw = el.value.replace(/[^0-9]/g, "");
+    if (raw !== ""){
+      let num = parseInt(raw, 10);
+      const max = parseInt(el.getAttribute("data-max"), 10);
+      if (!isNaN(max) && num > max) num = max;
+      raw = String(num);
+    }
+    if (raw !== el.value) el.value = raw;
+  });
+
+  document.getElementById("reset-btn").addEventListener("click", ()=>{
+    if (!confirm("Reset turnamen dan mulai dari awal?")) return;
+    state.phase = "setup";
+    state.currentView = "setup";
+    state.teams = [];
+    state.swissRound = 1;
+    state.swissMatches = [];
+    state.swissDone = false;
+    state.bracket = null;
+    state.roundIndex = 0;
+    state.champion = null;
+    state.playoffTab = "bracket";
+    state.savedToHistory = false;
+    state.historyDetail = null;
+    state.historyDetailTab = "bracket";
+    document.getElementById("reset-btn").classList.add("hidden");
+    document.getElementById("phase-pill").innerHTML = `<span class="badge-dot bg-arena-violet"></span> Setup`;
+    renderSetup();
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* INIT — Anti-hilang: load saved history from localStorage into      */
+  /* internal app state as soon as the app boots, so old history survives*/
+  /* a refresh, browser close, or machine restart.                      */
+  /* ---------------------------------------------------------------- */
+  function initApp(){
+    state.history = getHistoryList();
+    renderSetup();
+  }
+
+  initApp();
+})();
+</script>
+</body>
+</html>
